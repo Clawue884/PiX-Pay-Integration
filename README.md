@@ -1,6 +1,13 @@
 # PiX-Pay-Integration
 A repo for integrating Pi Network's Pi Coin with Twitter (X) APIs, focusing on wallet and micro-payment features for seamless social transactions.
 
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=node.js)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-4.18+-000000?style=flat-square&logo=express)](https://expressjs.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-7.0+-47A248?style=flat-square&logo=mongodb)](https://www.mongodb.com/)
+[![Socket.io](https://img.shields.io/badge/Socket.io-4.7+-010101?style=flat-square&logo=socket.io)](https://socket.io/)
+[![JWT](https://img.shields.io/badge/JWT-9.0+-000000?style=flat-square&logo=json-web-tokens)](https://jwt.io/)
+[![Passport](https://img.shields.io/badge/Passport-0.6+-34E27A?style=flat-square&logo=passport)](http://www.passportjs.org/)
+
 # PiX-Pay-Integration
 
 ## Description
