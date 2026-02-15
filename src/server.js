@@ -11,6 +11,13 @@ const http = require('http');
 const socketIo = require('socket.io');
 const winston = require('winston');
 
+// New imports for enhancements
+const config = require('../config/' + (process.env.NODE_ENV || 'development'));
+const { metricsMiddleware, register, transactionCounter, userGauge } = require('./monitoring/metrics');
+const adminRoutes = require('./routes/admin');
+const { require2FA } = require('./middleware/2fa');
+const AdvancedAIEngine = require('./ai/advanced-ai-engine');
+
 const authRoutes = require('./routes/auth');
 const walletRoutes = require('./routes/wallet');
 const paymentRoutes = require('./routes/payments');
@@ -18,30 +25,35 @@ const webhookRoutes = require('./routes/webhooks');
 const User = require('./models/User');
 
 const logger = winston.createLogger({
-  level: 'info',
+  level: config.logging.level,
   transports: [
     new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/server.log' })
+    new winston.transports.File({ filename: config.logging.file })
   ]
 });
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, { cors: { origin: '*' } });
+const io = socketIo(server, { cors: { origin: config.corsOrigin } });
 
-// Middleware
+// Initialize Advanced AI Engine
+const aiEngine = new AdvancedAIEngine();
+aiEngine.trainModel().catch(logger.error);  // Train on startup
+
+// Middleware with config
 app.use(helmet());
-app.use(cors());
+app.use(cors({ origin: config.corsOrigin }));
 app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+app.use(rateLimit(config.rateLimit));
+app.use(metricsMiddleware);  // Prometheus metrics
 
-// Passport OAuth
+// Passport OAuth with config
 passport.use(new TwitterStrategy({
-  consumerKey: process.env.X_API_KEY,
-  consumerSecret: process.env.X_API_SECRET,
-  callbackURL: process.env.OAUTH_CALLBACK_URL
+  consumerKey: config.xApiKey,
+  consumerSecret: config.xApiSecret,
+  callbackURL: config.oauthCallbackUrl || process.env.OAUTH_CALLBACK_URL
 }, async (token, tokenSecret, profile, done) => {
   try {
     let user = await User.findOne({ xUserId: profile.id });
@@ -60,21 +72,35 @@ app.use('/auth', authRoutes);
 app.use('/wallet', walletRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/webhooks', webhookRoutes);
+app.use('/admin', adminRoutes);  // New admin routes
 app.use(express.static('public')); // Serve frontend
 
-// Socket.io for real-time
+// Metrics endpoint for Prometheus
+if (config.monitoring) {
+  app.get('/metrics', async (req, res) => {
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  });
+}
+
+// Socket.io for real-time with metrics
 io.on('connection', (socket) => {
   logger.info('User connected via socket');
+  userGauge.inc();  // Increment active users
   socket.on('join', (userId) => socket.join(userId));
-  socket.on('sendTip', (data) => io.to(data.toUser).emit('tipReceived', data));
+  socket.on('sendTip', (data) => {
+    io.to(data.toUser).emit('tipReceived', data);
+    transactionCounter.inc({ type: 'tip' });  // Track transactions
+  });
+  socket.on('disconnect', () => userGauge.dec());  // Decrement on disconnect
 });
 
-// DB Connection
-mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+// DB Connection with config
+mongoose.connect(config.mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => logger.info('MongoDB connected'))
   .catch(err => logger.error('MongoDB connection error:', err));
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
+const PORT = config.port;
+server.listen(PORT, () => logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`));
 
-module.exports = { app, server, io };
+module.exports = { app, server, io, aiEngine };
