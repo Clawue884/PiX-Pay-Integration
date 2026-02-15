@@ -4,21 +4,36 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PiX Pay - Super Advanced Dashboard</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon-192.png">
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f4f4f4; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: #f4f4f4; transition: background 0.3s; }
+    .dark-mode { background: #121212; color: #ffffff; }
     .container { max-width: 1200px; margin: auto; }
-    .section { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    button { padding: 10px 15px; background: #1da1f2; color: white; border: none; border-radius: 5px; cursor: pointer; }
-    button:hover { background: #0d95e8; }
-    input, select { padding: 8px; margin: 5px; width: 200px; }
-    #notifications { position: fixed; top: 10px; right: 10px; width: 300px; background: #e8f5e8; border: 1px solid #4caf50; padding: 10px; display: none; }
+    .section { background: white; padding: 20px; margin: 20px 0; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); transition: transform 0.2s; }
+    .section:hover { transform: translateY(-2px); }
+    .dark-mode .section { background: #1e1e1e; color: #ffffff; }
+    button { padding: 12px 18px; background: linear-gradient(45deg, #1da1f2, #0d95e8); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; transition: background 0.3s; }
+    button:hover { background: linear-gradient(45deg, #0d95e8, #1da1f2); }
+    input, select { padding: 10px; margin: 5px; width: calc(100% - 20px); max-width: 300px; border: 1px solid #ddd; border-radius: 5px; }
+    .dark-mode input, .dark-mode select { background: #333; color: #fff; border-color: #555; }
+    #notifications { position: fixed; top: 10px; right: 10px; width: 320px; background: #e8f5e8; border: 1px solid #4caf50; padding: 15px; border-radius: 8px; display: none; z-index: 1000; }
+    .dark-mode #notifications { background: #2e7d32; color: #fff; }
     .hidden { display: none; }
-    .balance { font-size: 24px; color: #4caf50; }
-    .transaction { margin: 10px 0; padding: 10px; border-bottom: 1px solid #ddd; }
+    .balance { font-size: 28px; color: #4caf50; font-weight: bold; }
+    .transaction { margin: 10px 0; padding: 15px; border-bottom: 1px solid #ddd; border-radius: 5px; background: #fafafa; }
+    .dark-mode .transaction { background: #2a2a2a; border-color: #444; }
+    .chart-container { width: 100%; height: 300px; margin: 20px 0; }
+    .qr-code { text-align: center; margin: 20px 0; }
+    .toggle { position: fixed; top: 10px; left: 10px; }
+    @media (max-width: 768px) { .section { padding: 15px; } input { width: 100%; } #notifications { width: 90%; } }
   </style>
 </head>
 <body>
   <div class="container">
+    <div class="toggle">
+      <button onclick="toggleDarkMode()">Toggle Dark Mode</button>
+    </div>
     <h1>PiX Pay Dashboard</h1>
     <div id="notifications"></div>
 
@@ -35,6 +50,7 @@
       <form id="loginForm" class="hidden">
         <input type="email" id="loginEmail" placeholder="Email" required>
         <input type="password" id="loginPassword" placeholder="Password" required>
+        <input type="text" id="twoFactorToken" placeholder="2FA Token (if enabled)">
         <button type="submit">Login</button>
       </form>
       <button onclick="toggleForms()">Switch to Manual Auth</button>
@@ -46,6 +62,30 @@
       <div class="balance">Pi Balance: <span id="balance">0</span></div>
       <button onclick="minePi()">Mine Pi</button>
       <button onclick="getAIReport()">Get AI Report</button>
+      <button onclick="predictTrends()">Predict Trends</button>
+      <div id="adminPanel" class="hidden">
+        <h3>Admin Panel</h3>
+        <button onclick="viewUsers()">View Users</button>
+        <button onclick="bulkTip()">Bulk Tip</button>
+      </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div id="charts" class="section hidden">
+      <h2>Analytics Charts</h2>
+      <div class="chart-container">
+        <canvas id="balanceChart"></canvas>
+      </div>
+      <div class="chart-container">
+        <canvas id="transactionChart"></canvas>
+      </div>
+    </div>
+
+    <!-- 2FA Setup -->
+    <div id="2fa" class="section hidden">
+      <h2>Setup 2FA</h2>
+      <button onclick="setup2FA()">Setup 2FA</button>
+      <div id="qrCode" class="qr-code"></div>
     </div>
 
     <!-- Wallet Linking -->
@@ -71,14 +111,19 @@
   </div>
 
   <script src="https://cdn.socket.io/4.7.0/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     const socket = io('http://localhost:3000');
     let token = localStorage.getItem('token');
     let userId;
+    let isAdmin = false; // Set based on user role
 
     // DOM Elements
+    const body = document.body;
     const authDiv = document.getElementById('auth');
     const dashboardDiv = document.getElementById('dashboard');
+    const chartsDiv = document.getElementById('charts');
+    const twoFADiv = document.getElementById('2fa');
     const walletDiv = document.getElementById('wallet');
     const paymentsDiv = document.getElementById('payments');
     const notifications = document.getElementById('notifications');
@@ -86,11 +131,25 @@
     const userNameSpan = document.getElementById('userName');
     const historyDiv = document.getElementById('history');
     const suggestionSpan = document.getElementById('suggestion');
+    const adminPanel = document.getElementById('adminPanel');
+
+    // PWA Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(() => console.log('SW registered'));
+    }
+
+    // Dark Mode
+    function toggleDarkMode() {
+      body.classList.toggle('dark-mode');
+      localStorage.setItem('darkMode', body.classList.contains('dark-mode'));
+    }
+    if (localStorage.getItem('darkMode') === 'true') body.classList.add('dark-mode');
 
     // Initialize
     if (token) {
       showDashboard();
       loadUserData();
+      loadCharts();
     }
 
     // Auth Functions
@@ -125,9 +184,12 @@
 
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const headers = { 'Content-Type': 'application/json' };
+      const tokenField = document.getElementById('twoFactorToken').value;
+      if (tokenField) headers['x-2fa-token'] = tokenField;
       const res = await fetch('/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           email: document.getElementById('loginEmail').value,
           password: document.getElementById('loginPassword').value
@@ -138,8 +200,10 @@
         token = data.token;
         localStorage.setItem('token', token);
         userId = data.user.id;
+        isAdmin = data.user.username === 'admin'; // Check role
         showDashboard();
         loadUserData();
+        loadCharts();
       } else {
         showNotification(data.error, 'error');
       }
@@ -149,8 +213,11 @@
     function showDashboard() {
       authDiv.classList.add('hidden');
       dashboardDiv.classList.remove('hidden');
+      chartsDiv.classList.remove('hidden');
+      twoFADiv.classList.remove('hidden');
       walletDiv.classList.remove('hidden');
       paymentsDiv.classList.remove('hidden');
+      if (isAdmin) adminPanel.classList.remove('hidden');
       socket.emit('join', userId);
     }
 
@@ -159,7 +226,7 @@
       const data = await res.json();
       if (res.ok) {
         balanceSpan.textContent = data.balance;
-        userNameSpan.textContent = 'User'; // Fetch from profile if needed
+        userNameSpan.textContent = 'User';
       }
     }
 
@@ -169,6 +236,7 @@
       if (res.ok) {
         showNotification(`Mined ${data.reward} Pi!`);
         loadUserData();
+        loadCharts();
       } else {
         showNotification(data.error, 'error');
       }
@@ -179,6 +247,42 @@
       const data = await res.json();
       if (res.ok) {
         showNotification(data.report);
+      } else {
+        showNotification(data.error, 'error');
+      }
+    }
+
+    async function predictTrends() {
+      const res = await fetch('/ai/predict', { headers: { Authorization: `Bearer ${token}` } }); // Assume new endpoint
+      const data = await res.json();
+      if (res.ok) {
+        showNotification(`Predicted next tip: ${data.prediction} Pi`);
+      }
+    }
+
+    // Charts
+    async function loadCharts() {
+      const balanceRes = await fetch('/analytics/balance-history', { headers: { Authorization: `Bearer ${token}` } });
+      const balanceData = await balanceRes.json();
+      new Chart(document.getElementById('balanceChart'), {
+        type: 'line',
+        data: { labels: balanceData.labels, datasets: [{ label: 'Pi Balance', data: balanceData.values, borderColor: '#1da1f2' }] }
+      });
+
+      const txRes = await fetch('/analytics/transactions', { headers: { Authorization: `Bearer ${token}` } });
+      const txData = await txRes.json();
+      new Chart(document.getElementById('transactionChart'), {
+        type: 'bar',
+        data: { labels: txData.labels, datasets: [{ label: 'Transactions', data: txData.values, backgroundColor: '#4caf50' }] }
+      });
+    }
+
+    // 2FA
+    async function setup2FA() {
+      const res = await fetch('/auth/setup-2fa', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (res.ok) {
+        document.getElementById('qrCode').innerHTML = `<img src="${data.qrCodeUrl}" alt="QR Code">`;
       } else {
         showNotification(data.error, 'error');
       }
@@ -204,7 +308,7 @@
 
     // Payment Functions
     async function getSuggestion() {
-      const tweetContent = 'Sample tweet content'; // In real app, fetch from X API
+      const tweetContent = 'Sample tweet content';
       const res = await fetch('/payments/suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -231,6 +335,7 @@
         showNotification('Tip sent!');
         loadHistory();
         loadUserData();
+        loadCharts();
       } else {
         showNotification(data.error, 'error');
       }
@@ -244,10 +349,25 @@
       }
     }
 
+    // Admin Functions
+    async function viewUsers() {
+      const res = await fetch('/admin/users', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (res.ok) {
+        showNotification(`Users: ${data.length}`);
+      }
+    }
+
+    async function bulkTip() {
+      // Implement bulk tip UI
+      showNotification('Bulk tip feature coming soon!');
+    }
+
     // Real-time Notifications
     socket.on('tipReceived', (data) => {
       showNotification(`You received a tip: ${data.amount} Pi!`);
       loadUserData();
+      loadCharts();
     });
 
     // Utility
@@ -258,8 +378,8 @@
       setTimeout(() => notifications.style.display = 'none', 5000);
     }
 
-    // Load history on page load if logged in
+    // Load on init
     if (token) loadHistory();
   </script>
 </body>
-</html>
+        </html>
