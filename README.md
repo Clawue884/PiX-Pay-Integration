@@ -12,6 +12,9 @@ A repo for integrating Pi Network's Pi Coin with Twitter (X) APIs, focusing on w
 [![Pi Network](https://img.shields.io/badge/Pi%20Network-Beta-F7931A?style=flat-square&logo=pi-network)](https://minepi.com/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-API-412991?style=flat-square&logo=openai)](https://openai.com/)
 
+[![TensorFlow.js](https://img.shields.io/badge/TensorFlow.js-4.0+-FF6F00?style=flat-square&logo=tensorflow)](https://www.tensorflow.org/js)
+[![Chart.js](https://img.shields.io/badge/Chart.js-4.0+-FF6384?style=flat-square&logo=chart.js)](https://www.chartjs.org/)
+
 # PiX-Pay-Integration
 
 ## Description
