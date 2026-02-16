@@ -19,6 +19,10 @@ A repo for integrating Pi Network's Pi Coin with Twitter (X) APIs, focusing on w
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.27+-326CE5?style=flat-square&logo=kubernetes)](https://kubernetes.io/)
 [![Prometheus](https://img.shields.io/badge/Prometheus-2.40+-E6522C?style=flat-square&logo=prometheus)](https://prometheus.io/)
 
+[![Jest](https://img.shields.io/badge/Jest-29+-C21325?style=flat-square&logo=jest)](https://jestjs.io/)
+[![Helmet](https://img.shields.io/badge/Helmet-6.0+-000000?style=flat-square&logo=helmet)](https://helmetjs.github.io/)
+[![bcrypt](https://img.shields.io/badge/bcrypt-5.1+-000000?style=flat-square&logo=bcrypt)](https://www.npmjs.com/package/bcrypt)
+
 # PiX-Pay-Integration
 
 ## Description
