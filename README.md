@@ -23,6 +23,10 @@ A repo for integrating Pi Network's Pi Coin with Twitter (X) APIs, focusing on w
 [![Helmet](https://img.shields.io/badge/Helmet-6.0+-000000?style=flat-square&logo=helmet)](https://helmetjs.github.io/)
 [![bcrypt](https://img.shields.io/badge/bcrypt-5.1+-000000?style=flat-square&logo=bcrypt)](https://www.npmjs.com/package/bcrypt)
 
+[![Winston](https://img.shields.io/badge/Winston-3.8+-000000?style=flat-square&logo=winston)](https://github.com/winstonjs/winston)
+[![QRCode](https://img.shields.io/badge/QRCode-1.5+-000000?style=flat-square&logo=qrcode)](https://www.npmjs.com/package/qrcode)
+[![Speakeasy](https://img.shields.io/badge/Speakeasy-2.0+-000000?style=flat-square&logo=speakeasy)](https://www.npmjs.com/package/speakeasy)
+
 # PiX-Pay-Integration
 
 ## Description
