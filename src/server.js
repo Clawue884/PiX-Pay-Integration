@@ -17,6 +17,11 @@ const { metricsMiddleware, register, transactionCounter, userGauge } = require('
 const adminRoutes = require('./routes/admin');
 const { require2FA } = require('./middleware/2fa');
 const AdvancedAIEngine = require('./ai/advanced-ai-engine');
+const NLPEngine = require('./ai/nlp-engine');
+const Chatbot = require('./ai/chatbot');
+const MarketPredictor = require('./ai/market-predictor');
+const DynamicPricing = require('./ai/dynamic-pricing');
+const aiRoutes = require('./routes/ai');
 
 const authRoutes = require('./routes/auth');
 const walletRoutes = require('./routes/wallet');
@@ -36,9 +41,19 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, { cors: { origin: config.corsOrigin } });
 
-// Initialize Advanced AI Engine
+// Initialize Advanced AI Engines
 const aiEngine = new AdvancedAIEngine();
-aiEngine.trainModel().catch(logger.error);  // Train on startup
+const nlpEngine = new NLPEngine();
+const chatbot = new Chatbot();
+const marketPredictor = new MarketPredictor();
+const dynamicPricing = new DynamicPricing();
+
+// Train models on startup (async to avoid blocking)
+Promise.all([
+  aiEngine.trainModel().catch(logger.error),
+  marketPredictor.trainOnHistoricalData().catch(logger.error),
+  dynamicPricing.trainPricingModel([]).catch(logger.error)  // Pass empty array or load from DB
+]).then(() => logger.info('All AI models initialized and trained'));
 
 // Middleware with config
 app.use(helmet());
@@ -72,7 +87,8 @@ app.use('/auth', authRoutes);
 app.use('/wallet', walletRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/webhooks', webhookRoutes);
-app.use('/admin', adminRoutes);  // New admin routes
+app.use('/admin', adminRoutes);  // Admin routes
+app.use('/ai', aiRoutes);  // New AI routes
 app.use(express.static('public')); // Serve frontend
 
 // Metrics endpoint for Prometheus
@@ -97,10 +113,4 @@ io.on('connection', (socket) => {
 
 // DB Connection with config
 mongoose.connect(config.mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => logger.info('MongoDB connected'))
-  .catch(err => logger.error('MongoDB connection error:', err));
-
-const PORT = config.port;
-server.listen(PORT, () => logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`));
-
-module.exports = { app, server, io, aiEngine };
+  .then(() =>
